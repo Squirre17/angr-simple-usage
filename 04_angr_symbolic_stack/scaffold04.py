@@ -38,7 +38,7 @@ def main(argv):
   # Given that we are not calling scanf in our Angr simulation, where should we
   # start?
   # (!)
-  start_address = ???
+  start_address = 0x40139B
   initial_state = project.factory.blank_state(
     addr=start_address,
     add_options = { angr.options.SYMBOL_FILL_UNCONSTRAINED_MEMORY,
@@ -69,7 +69,7 @@ def main(argv):
   # Since we are starting after scanf, we are skipping this stack construction
   # step. To make up for this, we need to construct the stack ourselves. Let us
   # start by initializing ebp in the exact same way the program does.
-  initial_state.regs.ebp = initial_state.regs.esp
+  initial_state.regs.rbp = initial_state.regs.rsp
 
   # scanf("%u %u") needs to be replaced by injecting two bitvectors. The
   # reason for this is that Angr does not (currently) automatically inject
@@ -77,7 +77,8 @@ def main(argv):
   # handle 'scanf("%u")', but not 'scanf("%u %u")'.
   # You can either copy and paste the line below or use a Python list.
   # (!)
-  password0 = claripy.BVS('password0', ???)
+  pswd_0 = claripy.BVS('password0', 64)
+#   pswd_1 = claripy.BVS('password1', 32)
   ...
 
   # Here is the hard part. We need to figure out what the stack looks like, at
@@ -122,8 +123,7 @@ def main(argv):
   #
   # Figure out how much space there is and allocate the necessary padding to
   # the stack by decrementing esp before you push the password bitvectors.
-  padding_length_in_bytes = ???  # :integer
-  initial_state.regs.esp -= padding_length_in_bytes
+
 
   # Push the variables to the stack. Make sure to push them in the right order!
   # The syntax for the following function is:
@@ -133,29 +133,38 @@ def main(argv):
   # This will push the bitvector on the stack, and increment esp the correct
   # amount. You will need to push multiple bitvectors on the stack.
   # (!)
-  initial_state.stack_push(???)  # :bitvector (claripy.BVS, claripy.BVV, claripy.BV)
-  ...
+  initial_state.stack_push(initial_state.regs.rbp)  # :bitvector (claripy.BVS, claripy.BVV, claripy.BV)
+  initial_state.regs.rbp = initial_state.regs.rsp
+
+#   padding_length_in_bytes = 8  # :integer
+#   initial_state.regs.rsp -= padding_length_in_bytes
+
+  initial_state.stack_push(pswd_0)  # :bitvector (claripy.BVS, claripy.BVV, claripy.BV)
+#   initial_state.stack_push(pswd_1)  # :bitvector (claripy.BVS, claripy.BVV, claripy.BV)
 
   simulation = project.factory.simgr(initial_state)
 
   def is_successful(state):
     stdout_output = state.posix.dumps(sys.stdout.fileno())
-    return ???
+    return b"Good Job." in stdout_output
 
   def should_abort(state):
     stdout_output = state.posix.dumps(sys.stdout.fileno())
-    return ???
+    return b"Try again." in stdout_output
 
   simulation.explore(find=is_successful, avoid=should_abort)
 
   if simulation.found:
     solution_state = simulation.found[0]
+    print(solution_state.posix.dumps(1))
 
-    solution0 = solution_state.solver.eval(password0)
-    ...
+    solution0 = solution_state.solver.eval(pswd_0)
+    # solution1 = solution_state.solver.eval(pswd_1)
 
-    solution = ???
-    print(solution)
+    # solution = solution0.poxis.dumps(0)
+    p1 = (solution0 >> 32) & 0xffffff
+    p2 = solution0 & 0xffffff
+    print("{} {}".format(p1, p2))
   else:
     raise Exception('Could not find the solution')
 

@@ -32,3 +32,41 @@
 # can take a long time with Angr, so you should replace it with a SimProcedure.
 # angr.SIM_PROCEDURES['glibc']['__libc_start_main']
 # Note 'glibc' instead of 'libc'.
+import angr
+import sys
+
+printf_addr       = 0x410b10
+scanf_addr        = 0x410ca0
+puts_addr         = 0x420a30
+__libc_start_main = 0x402230
+strcmp_addr       = 0x430e60
+
+p = angr.Project(sys.argv[1])
+init_state = p.factory.entry_state(
+    add_options = {
+        angr.options.SYMBOL_FILL_UNCONSTRAINED_MEMORY,
+        angr.options.SYMBOL_FILL_UNCONSTRAINED_REGISTERS,
+    },
+)
+sm = p.factory.simgr(init_state)
+
+p.hook(printf_addr      , angr.SIM_PROCEDURES["libc"]["printf"]())
+p.hook(scanf_addr       , angr.SIM_PROCEDURES["libc"]["scanf"]())
+# p.hook(puts_addr        , angr.SIM_PROCEDURES["libc"]["puts"]())
+p.hook(strcmp_addr      , angr.SIM_PROCEDURES["libc"]["strcmp"]())
+p.hook(__libc_start_main, angr.SIM_PROCEDURES["glibc"]["__libc_start_main"]())
+
+def is_successful(state):
+    return b"Good Job" in state.posix.dumps(1)
+
+def should_abort(state):
+    return b"Try again" in state.posix.dumps(1)
+
+
+sm.explore(find = 0x401E85)
+
+if sm.found:
+    print(sm.found[0].posix.dumps(1))
+    print(sm.found[0].posix.dumps(0))
+else:
+    raise Exception("Not found")

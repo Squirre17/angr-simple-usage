@@ -51,26 +51,31 @@ def main(argv):
   path_to_binary = argv[1]
   project = angr.Project(path_to_binary)
 
-  start_address = ???
+  start_address = 0x40130B
   initial_state = project.factory.blank_state(
     addr=start_address,
     add_options = { angr.options.SYMBOL_FILL_UNCONSTRAINED_MEMORY,
                     angr.options.SYMBOL_FILL_UNCONSTRAINED_REGISTERS}
   )
 
-  password = claripy.BVS('password', ???)
+  password = claripy.BVS('password', 16 * 8)
 
-  password_address = ???
-  initial_state.memory.store(password_address, password)
+  buf_addr = 0x404070
+  initial_state.memory.store(buf_addr, password)
 
   simulation = project.factory.simgr(initial_state)
 
   # Angr will not be able to reach the point at which the binary prints out
   # 'Good Job.'. We cannot use that as the target anymore.
   # (!)
-  address_to_check_constraint = ???
+  '''
+  objdump -t angr_constraint| grep check_equals_LCILGCDAHMGIBNZL        
+  000000000040123d g     F .text  0000000000000062              check_equals_LCILGCDAHMGIBNZL
+  '''
+  address_to_check_constraint = 0x40123d
   simulation.explore(find=address_to_check_constraint)
 
+#   for solution_state in simulation.found:
   if simulation.found:
     solution_state = simulation.found[0]
 
@@ -78,8 +83,9 @@ def main(argv):
     # check_equals_ function. Determine the address that is being passed as the
     # parameter and load it into a bitvector so that we can constrain it.
     # (!)
-    constrained_parameter_address = ???
-    constrained_parameter_size_bytes = ???
+    constrained_parameter_address = buf_addr
+    constrained_parameter_size_bytes = 16
+    # NOTE:
     constrained_parameter_bitvector = solution_state.memory.load(
       constrained_parameter_address,
       constrained_parameter_size_bytes
@@ -87,7 +93,7 @@ def main(argv):
     # We want to constrain the system to find an input that will make
     # constrained_parameter_bitvector equal the desired value.
     # (!)
-    constrained_parameter_desired_value = ??? # :string (encoded)
+    constrained_parameter_desired_value = b"LCILGCDAHMGIBNZL" # :string (encoded)
 
     # Specify a claripy expression (using Pythonic syntax) that tests whether
     # constrained_parameter_bitvector == constrained_parameter_desired_value.
@@ -97,7 +103,7 @@ def main(argv):
 
     # Solve for the constrained_parameter_bitvector.
     # (!)
-    solution = ???
+    solution = solution_state.solver.eval(password, cast_to=bytes)
 
     print(solution)
   else:

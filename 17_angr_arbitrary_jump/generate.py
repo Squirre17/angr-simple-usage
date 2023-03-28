@@ -29,7 +29,8 @@ def generate(argv):
   with tempfile.NamedTemporaryFile(delete=False, suffix='.c', mode='w') as temp:
     temp.write(c_code)
     temp.seek(0)
-    os.system('gcc -fno-stack-protector -Wl,--section-start=.text=' + text_address + ' -fno-pie -no-pie -m32 -o ' + output_file + ' ' + temp.name)
+    print(temp.name)
+    os.system('gcc -g -fno-stack-protector -Wl,--section-start=.text=' + text_address + ' -fno-pie -no-pie -o ' + output_file + ' ' + temp.name)
 
 if __name__ == '__main__':
   generate(sys.argv)

@@ -33,7 +33,7 @@ def main(argv):
 
   # Make a symbolic input that has a decent size to trigger overflow
   # (!)
-  symbolic_input = claripy.BVS("input", ???)
+  symbolic_input = claripy.BVS("input", 0x40 * 8)
 
   # Create initial state and set stdin to the symbolic input
   initial_state = project.factory.entry_state(
@@ -52,9 +52,9 @@ def main(argv):
   # (!)
   simulation = project.factory.simgr(
     initial_state,
-    save_unconstrained=???,
+    save_unconstrained=True,
     stashes={
-      'active' : [???],
+      'active' : [initial_state],
       'unconstrained' : [],
       'found' : [],
       'not_needed' : []
@@ -68,7 +68,7 @@ def main(argv):
   # states from the unconstrained list to the simulation.found list.
   # Create a boolean value that indicates a state has been found.
   def has_found_solution():
-    return simulation.found
+    return len(simulation.found) > 0
 
   # An unconstrained state occurs when there are too many possible branches
   # from a single instruction. This occurs, among other ways, when the
@@ -88,13 +88,13 @@ def main(argv):
   # by examining the simulation.unconstrained list.
   # (!)
   def has_unconstrained_to_check():
-    return ???
+    return len(simulation.unconstrained) > 0
 
   # The list simulation.active is a list of all states that can be explored
   # further.
   # (!)
   def has_active():
-    return ???
+    return len(simulation.active) > 0
 
   while (has_active() or has_unconstrained_to_check()) and (not has_found_solution()):
     for unconstrained_state in simulation.unconstrained:
@@ -109,6 +109,7 @@ def main(argv):
         #  anything else = whatever you want, perhaps you want a 'not_needed',
         #                  you can call it whatever you want
         # (!)
+      print("HIT unconstrained")
       simulation.move('unconstrained', 'found')
 
     # Advance the simulation.
@@ -119,20 +120,25 @@ def main(argv):
 
     # Constrain the instruction pointer to target the print_good function and
     # (!)
-    solution_state.add_constraints(solution_state.regs.eip == ???)
+    print_good_addr = 0x4c434925
+    solution_state.add_constraints(solution_state.regs.rip == print_good_addr)
 
     # Constrain the symbolic input to fall within printable range (capital
     # letters) for the web UI.  Ensure UTF-8 encoding.
     # (!)
     for byte in symbolic_input.chop(bits=8):
-      solution_state.add_constraints(
-              byte >= ???,
-              byte <= ???
-      )
+    #   solution_state.add_constraints(
+    #           byte >= 'A',
+    #           byte <= 'Z'
+    #   )
+        ...
 
     # Solve for the symbolic_input
-    solution = solution_state.solver.eval(symbolic_input,cast_to=bytes).decode()
-    print(solution)
+    solution = solution_state.solver.eval(symbolic_input,cast_to=bytes)
+    import binascii
+    hex_string = binascii.hexlify(solution).decode()
+    out = "".join("\\x{}".format(hex_string[i:i+2]) for i in range(0, len(hex_string), 2))
+    print(out)
   else:
     raise Exception('Could not find the solution')
 

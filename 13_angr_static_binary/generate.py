@@ -20,7 +20,8 @@ def generate(argv):
   with tempfile.NamedTemporaryFile(delete=False, suffix='.c', mode='w') as temp:
     temp.write(c_code)
     temp.seek(0)
-    os.system('gcc -static -fno-pie -no-pie -m32 -o ' + output_file + ' ' + temp.name)
+    print(temp.name)
+    os.system('gcc -static -fno-pie -no-pie -o ' + output_file + ' ' + temp.name)
 
 if __name__ == '__main__':
   generate(sys.argv)
